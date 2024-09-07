@@ -1,0 +1,147 @@
+#!/bin/bash
+##################################################################################################################
+#Este script realiza o scan da rede utilizando o comando ping, a fim de verificar quais host estão ativos na rede.
+#Create Data: 17/10/2023
+#Last Update: 5/09/2024
+#Autor: Alexandre
+#################################################################################################################
+#--------------------------------------------------------------------------------------
+#-----Função---------------------------------------------------------------------------
+
+#----------Faze a validação do endereço ip informado-----------------------------------
+ validarIP() {
+    local ip="$1"
+    # Verifica se o IP corresponde ao padrão básico
+   if [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]
+   then
+        # Extrai os octetos
+        oct1=${BASH_REMATCH[1]}
+        oct2=${BASH_REMATCH[2]}
+        oct3=${BASH_REMATCH[3]}
+        oct4=${BASH_REMATCH[4]}
+        
+    # Verifica se cada octeto está no intervalo de 0 a 255
+    if (( oct1 >= 0 && oct1 <= 255 )) && (( oct2 >= 0 && oct2 <= 255 )) && (( oct3 >= 0 && oct3 <= 255 )) && (( oct4 >= 0 && oct4 <= 255 ))
+    then
+       return 0  #IP Address OK
+    fi
+   fi
+    return 1   #IP Address wrong
+ }
+
+#--------------------------------------------------------------------------------------
+clear
+
+ IP_ATIVO="/tmp/ip_ativo"
+
+ IP_DESATIVADO="/tmp/ip_desativado"
+
+# cria o arquivo com os endereços IP's ativos
+  > $IP_ATIVO
+  echo -n "Data:" >> $IP_ATIVO
+  date >> $IP_ATIVO
+  echo "-------------------------------------------" >> $IP_ATIVO 
+  
+# cria o arquivo com os endereços IP's desativados
+  > $IP_DESATIVADO
+  echo -n "Data:" >> $IP_DESATIVADO
+  date >> $IP_DESATIVADO
+  echo "-------------------------------------------" >> $IP_DESATIVADO
+
+#----------------------Captura os dados informados pelo usuário---------------------------------
+
+ read -p 'Informe os 3 primeiros octetos da rede ipv4 a ser escaneada (ex: 192.168.1):' network
+ read -p 'Informe o host inicial da rede (último octeto do IP: x.x.x.10):' first_host
+ read -p 'Informe o host final da rede (último octeto do IP: x.x.x.12):' last_host
+
+#-------------------------Validaçao do IP informado--------------------------------------------
+
+ firstAddressIP=$network.$first_host
+ 
+ validarIP $firstAddressIP   #chama a função de validação de IP
+ 
+ if [ $? -eq 1 ]
+ then 
+      echo "O Endereço IP ($firstAddressIP) informado é inválido!"
+      exit 1 
+ fi
+ 
+ lastAddressIP=$network.$last_host
+ 
+ validarIP $lastAddressIP   
+ 
+ if [ $? -eq 1 ]
+ then 
+      echo "Endereço IP ($lastAddressIP) informado é inválido!"
+      exit 1 
+ fi
+ 
+#---------------------------------------------------------------------------------------------      
+host_escaneado=0
+
+NUMERO_DE_HOSTS=$(($last_host - $first_host + 1))  
+
+if [ $first_host -le $last_host ] #external if
+ then
+   
+  for (( equipamento=$first_host; equipamento<=$last_host; equipamento++ ))
+  do 
+      clear
+      echo "Número de host a ser escaneados: $NUMERO_DE_HOSTS"
+      ((host_escaneado++)) 
+      echo -n "Progresso ($host_escaneado/$NUMERO_DE_HOSTS)):"
+
+       ip=$network.$equipamento
+
+       ping -c 1 $ip >/dev/null
+
+       result=$? 
+   
+   if [ $result -eq 0 ]
+     then
+         echo "Endereço IP $ip ON." >> $IP_ATIVO
+      else
+         echo "Endereço IP $ip OFF." >> $IP_DESATIVADO
+   fi #end if-else 
+ done #end loop for
+
+echo ' 100% concluído.'
+#-----------------------------------------------------------------------------------------
+
+   if [ -e $IP_ATIVO ]
+    then
+          total_ip_ativos=$(wc -l $IP_ATIVO|cut -f1 -d' ')
+          #echo "-------------------------------------------"
+          echo -e "\nLista de endereços IPs ativos na rede:"
+          #echo "-------------------------------------------"
+          echo "--------------------------------------------"
+          echo "Total de host ativos: $(($total_ip_ativos-2))"
+          cat $IP_ATIVO
+          echo "-------------------------------------------"
+   fi #end if 
+
+   if [ -e $IP_DESATIVADO ]
+     then
+          total_ip_desativados=$(wc -l $IP_DESATIVADO|cut -f1 -d' ')
+          #echo "-------------------------------------------"
+          echo -e "\nLista de endereços IPs desativados na rede:"
+          #echo "-------------------------------------------"
+          echo "-------------------------------------------" 
+          echo "Total de host inativos: $(($total_ip_desativados-2))"
+          cat  $IP_DESATIVADO
+          echo "------------------------------------------"
+   fi #end if 
+else #external if-else
+      echo "O host inicial tem que ser maior ou igual ao host final!"
+fi #end if-else external
+#--------------------------------------------------------------------------------------
+
+ 
+
+
+
+
+
+
+
+
